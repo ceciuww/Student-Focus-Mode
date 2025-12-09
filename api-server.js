@@ -22,8 +22,22 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("Reason:", reason)
 })
 
+// Update CORS configuration
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://tranquil-froyo-0c2b2b.netlify.app',
+    'https://*.netlify.app'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+}
+
 // Middleware
-app.use(cors())
+app.use(cors(corsOptions)) // Menggunakan konfigurasi CORS yang baru
 app.use(express.json())
 
 // Request logging middleware

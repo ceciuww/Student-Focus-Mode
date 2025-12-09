@@ -1,5 +1,7 @@
-// API Configuration - Local server
-const BASE_URL = 'http://localhost:3001/api';
+// API Configuration - Supports both local and production
+const BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3001/api'  
+  : '/api';                       
 
 // Helper to get auth token
 const getAuthToken = () => localStorage.getItem('authToken');
