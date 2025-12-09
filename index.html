@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusMode - Premium Learning Experience</title>
+    <meta name="description"
+        content="Aplikasi premium untuk meningkatkan fokus belajar dengan teknik Pomodoro, pencatatan, dan manajemen waktu">
+    <meta name="theme-color" content="#74b9ff">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" href="src/icons/icon-72x72.png" type="image/png">
+    <link rel="apple-touch-icon" href="src/icons/icon-192x192.png">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- CSS Styles -->
+    <style>
+        /* Reset dan Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Loading Indicator */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Header Styles */
+        .premium-header {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+
+        .logo i {
+            margin-right: 10px;
+            font-size: 1.8rem;
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+        }
+
+        nav ul li {
+            margin: 0 15px;
+        }
+
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        nav ul li a:hover {
+            opacity: 0.8;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: white;
+            color: #74b9ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+            text-align: left;
+            padding: 0;
+            margin-top: 2px;
+        }
+
+        .logout-btn:hover {
+            text-decoration: underline;
+        }
+
+        /* Main Content */
+        main {
+            min-height: calc(100vh - 140px);
+            padding: 30px 0;
+        }
+
+        /* Footer Styles */
+        .premium-footer {
+            background-color: #2d3436;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .footer-copyright {
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .footer-message i {
+            color: #e84393;
+        }
+
+        /* Install Button */
+        .install-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .install-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .install-btn i {
+            margin-right: 8px;
+        }
+
+        /* Toast Container */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+            }
+
+            .logo {
+                margin-bottom: 15px;
+            }
+
+            nav ul {
+                flex-wrap: wrap;
+                justify-content: center;
+                margin-bottom: 15px;
+            }
+
+            nav ul li {
+                margin: 5px 10px;
+            }
+
+            .user-info {
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" class="loading">
+        <div class="loading-spinner"></div>
+        <p>Memuat Pengalaman Premium...</p>
+    </div>
+
+    <!-- Authentication Container -->
+    <div id="auth-container" class="hidden">
+        <!-- Login/Register pages will be rendered here -->
+    </div>
+
+    <!-- Main Application -->
+    <div id="app" class="hidden">
+        <!-- Premium Header -->
+        <header class="premium-header">
+            <div class="container">
+                <div class="header-content">
+                    <a href="#/" class="logo">
+                        <i class="fas fa-crown"></i>
+                        <span>FocusMode</span>
+                    </a>
+                    <nav>
+                        <ul>
+                            <li><a href="#/">Beranda</a></li>
+                            <li><a href="#/fitur">Fitur</a></li>
+                            <li><a href="#/focus-mode">Focus Mode</a></li>
+                            <li><a href="#/sesi-belajar">Sesi Belajar</a></li>
+                            <li><a href="#/catatan">Catatan</a></li>
+                            <li><a href="#/rak-buku">Rak Buku</a></li>
+                        </ul>
+                    </nav>
+                    <div class="user-info">
+                        <div class="user-profile" id="user-profile">
+                            <div class="user-avatar" id="user-avatar">
+                                <!-- Avatar akan diisi oleh JavaScript -->
+                            </div>
+                            <div class="user-details">
+                                <span class="user-name" id="user-name">User</span>
+                                <button class="logout-btn" id="logout-btn">
+                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <div id="main-content">
+                <!-- Pages will be rendered here -->
+            </div>
+        </main>
+
+        <!-- Premium Footer -->
+        <footer class="premium-footer">
+            <div class="container">
+                <div class="footer-content">
+                    <p class="footer-copyright">
+                        &copy; 2024 FocusMode Premium - Student Distraction-Free Learning
+                    </p>
+                    <p class="footer-message">
+                        Dibuat dengan <i class="fas fa-heart"></i> untuk membantu siswa Indonesia belajar lebih fokus
+                        dan produktif
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Install Button -->
+    <button id="install-button" class="install-btn hidden">
+        <i class="fas fa-download"></i> Install App
+    </button>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- JavaScript Files -->
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>

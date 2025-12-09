@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+build/
+
+# Configuration files
+*.config.js
+webpack.*.js
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Service worker
+sw.js
+
+# Package lock
+package-lock.json
+yarn.lock
+
+# Coverage
+coverage/
+
+# Icons and images (binary files)
+icons/
+screenshots/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+
+# Manifest
+manifest.json
