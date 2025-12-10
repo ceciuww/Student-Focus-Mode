@@ -1,20 +1,21 @@
-import MiniCssExtractPlugin from 'mini-css-extract-plugin';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
-import { merge } from 'webpack-merge';
-import common from './webpack.common.js';
+import MiniCssExtractPlugin from "mini-css-extract-plugin"
+import { dirname, resolve } from "path"
+import { fileURLToPath } from "url"
+import { merge } from "webpack-merge"
+import common from "./webpack.common.js"
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export default merge(common, {
-  mode: 'production',
-  devtool: 'source-map',
+  mode: "production",
+  devtool: "source-map",
   output: {
-    filename: '[name].[contenthash].bundle.js',
-    path: resolve(__dirname, 'dist'),
+    filename: "[name].[contenthash].bundle.js",
+    path: resolve(__dirname, "dist"),
     clean: true,
-    publicPath: '/',
+    publicPath: "/",
+    assetModuleFilename: "assets/[name][ext]",
   },
   module: {
     rules: [
@@ -23,21 +24,27 @@ export default merge(common, {
         use: [
           MiniCssExtractPlugin.loader,
           {
-            loader: 'css-loader',
+            loader: "css-loader",
             options: {
               modules: false,
-            }
-          }
+            },
+          },
         ],
+      },
+      {
+        test: /\.(png|jpg|jpeg|gif|ico|svg)$/i,
+        type: "asset/resource",
+        generator: {
+          filename: "images/[name][ext]",
+        },
       },
     ],
   },
   plugins: [
     new MiniCssExtractPlugin({
-      filename: '[name].[contenthash].css',
-      chunkFilename: '[id].[contenthash].css',
+      filename: "[name].[contenthash].css",
+      chunkFilename: "[id].[contenthash].css",
     }),
-    // Removed Workbox plugin - you'll need to manually handle service worker
   ],
   optimization: {
     minimize: true,
@@ -48,6 +55,6 @@ export default merge(common, {
   performance: {
     maxEntrypointSize: 512000,
     maxAssetSize: 512000,
-    hints: 'warning',
+    hints: "warning",
   },
-});
+})
