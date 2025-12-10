@@ -4,25 +4,13 @@ import { OfflineManager } from './src/js/offline.js';
 import './src/styles/responsive.css';
 import './src/styles/styles.css';
 
-// ==================== KONFIGURASI ====================
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://api-focusmode-production.up.railway.app/api'
-  : 'http://localhost:3001/api';
-
+// Tambahkan di bagian atas main.js
+const BASE_URL = '/api';
 let authToken = null;
-let currentUser = null;
-let isLoadingPage = false;
-let timerInterval;
-let timerMinutes = 25;
-let timerSeconds = 0;
-let isTimerRunning = false;
-let currentTimerType = 'pomodoro';
-
-// ==================== FUNGSI HELPER ====================
 
 // Fungsi helper untuk API calls
 async function apiCall(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = `${BASE_URL}${endpoint}`;
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -51,66 +39,37 @@ async function apiCall(endpoint, options = {}) {
   }
 }
 
-// Fungsi untuk menampilkan toast notifikasi
-function showToast(message, type = 'info') {
-  const toastContainer = document.getElementById('toast-container');
-  if (!toastContainer) return;
+// Update fungsi login/register di main.js untuk menggunakan API
 
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type} premium-toast`;
-  toast.innerHTML = `
-    <div class="toast-content">
-      <i class="fas ${
-        type === 'success'
-          ? 'fa-check-circle'
-          : type === 'error'
-          ? 'fa-times-circle'
-          : type === 'warning'
-          ? 'fa-exclamation-triangle'
-          : 'fa-info-circle'
-      }"></i>
-      <span>${message}</span>
-    </div>
-  `;
-  toastContainer.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.add('show');
-  }, 10);
-
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 300);
-  }, 3000);
+// Inisialisasi Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then(registration => {
+        console.log('SW registered: ', registration);
+      })
+      .catch(registrationError => {
+        console.log('SW registration failed: ', registrationError);
+      });
+  });
 }
 
-// Fungsi untuk mendapatkan label kategori
-function getCategoryLabel(cat) {
-  const map = {
-    study: 'Studi',
-    personal: 'Personal',
-    work: 'Pekerjaan',
-    other: 'Lainnya',
-  };
-  return map[cat] || cat;
+// Inisialisasi Notifikasi
+async function initializeNotifications() {
+  try {
+    await NotificationManager.requestPermission();
+    console.log('Notification permission granted');
+  } catch (error) {
+    console.log('Notification permission denied');
+  }
 }
 
-// Fungsi untuk mendapatkan label kategori buku
-function getBookCategoryLabel(cat) {
-  const map = {
-    academic: 'Akademik',
-    fiction: 'Fiksi',
-    'non-fiction': 'Non-Fiksi',
-    reference: 'Referensi',
-  };
-  return map[cat] || cat;
-}
+// Panggil inisialisasi notifikasi
+initializeNotifications();
 
-// ==================== AUTHENTIKASI ====================
+// Simple authentication state
+let currentUser = null;
 
 // Check if user is logged in
 function checkAuth() {
@@ -241,23 +200,6 @@ function showAuthPage() {
   `;
   document.head.appendChild(style);
 
-  initializeAuthPage();
-}
-
-function switchAuthTab(tabName) {
-  document.querySelectorAll('.auth-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.getAttribute('data-tab') === tabName);
-  });
-  document
-    .getElementById('loginForm')
-    .classList.toggle('active', tabName === 'login');
-  document
-    .getElementById('registerForm')
-    .classList.toggle('active', tabName === 'register');
-}
-
-// Initialize authentication page
-function initializeAuthPage() {
   // Tab switching
   document.querySelectorAll('.auth-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -283,6 +225,7 @@ function initializeAuthPage() {
     const password = document.getElementById('password').value;
 
     try {
+      // Try API login first
       const data = await apiCall('/auth/login', {
         method: 'POST',
         body: { email, password },
@@ -299,6 +242,7 @@ function initializeAuthPage() {
       });
     } catch (error) {
       console.warn('API login failed, trying local login:', error.message);
+      // Fallback to local login
       const users = JSON.parse(localStorage.getItem('users') || '[]');
       const user = users.find(
         u => u.email === email && u.password === password
@@ -340,6 +284,7 @@ function initializeAuthPage() {
       }
 
       try {
+        // Try API registration first
         const data = await apiCall('/auth/register', {
           method: 'POST',
           body: { name, email, password },
@@ -361,6 +306,7 @@ function initializeAuthPage() {
           error.message
         );
 
+        // Check if error is about existing user
         if (
           error.message.includes('exists') ||
           error.message.includes('terdaftar')
@@ -369,6 +315,7 @@ function initializeAuthPage() {
           return;
         }
 
+        // Fallback to local registration
         const users = JSON.parse(localStorage.getItem('users') || '[]');
         if (users.find(u => u.email === email)) {
           showToast('Email sudah terdaftar!', 'error');
@@ -388,7 +335,7 @@ function initializeAuthPage() {
         localStorage.setItem('users', JSON.stringify(users));
 
         currentUser = newUser;
-        localStorage.setItem('currentUser', JSON.stringify(newUser));
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
         showMainApp();
         showToast('Akun berhasil dibuat (offline)!', 'success');
         NotificationManager.show('Akun Berhasil Dibuat!', {
@@ -397,6 +344,18 @@ function initializeAuthPage() {
         });
       }
     });
+}
+
+function switchAuthTab(tabName) {
+  document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.getAttribute('data-tab') === tabName);
+  });
+  document
+    .getElementById('loginForm')
+    .classList.toggle('active', tabName === 'login');
+  document
+    .getElementById('registerForm')
+    .classList.toggle('active', tabName === 'register');
 }
 
 // Show main application
@@ -429,8 +388,7 @@ function showMainApp() {
   }
 }
 
-// ==================== DATA MANAGER ====================
-
+// Data management with API integration
 const DataManager = {
   // Notes
   async getNotes(category = 'all') {
@@ -438,6 +396,7 @@ const DataManager = {
       if (authToken && currentUser) {
         const query = category !== 'all' ? `?category=${category}` : '';
         const notes = await apiCall(`/notes${query}`);
+        // Map database fields to frontend format
         return notes.map(note => ({
           id: note.id,
           title: note.title,
@@ -450,7 +409,7 @@ const DataManager = {
     } catch (error) {
       console.warn('API getNotes failed, using localStorage:', error.message);
     }
-    
+    // Fallback to localStorage
     if (!currentUser || !currentUser.id) return [];
     try {
       const notes = JSON.parse(
@@ -467,6 +426,7 @@ const DataManager = {
   async saveNote(note) {
     try {
       if (authToken && currentUser) {
+        // Prepare data for API
         const noteData = {
           title: note.title,
           content: note.content,
@@ -474,10 +434,12 @@ const DataManager = {
         };
 
         if (note.id) {
+          // Update existing note
           await apiCall(`/notes/${note.id}`, { method: 'PUT', body: noteData });
           console.log('✅ Note updated in database:', note.id);
           return { ...note, ...noteData, updatedAt: new Date().toISOString() };
         } else {
+          // Create new note
           const result = await apiCall('/notes', {
             method: 'POST',
             body: noteData,
@@ -535,7 +497,7 @@ const DataManager = {
     } catch (error) {
       console.warn('API deleteNote failed, using localStorage:', error.message);
     }
-    
+    // Fallback to localStorage
     if (!currentUser || !currentUser.id) return;
     const notes = JSON.parse(
       localStorage.getItem(`notes_${currentUser.id}`) || '[]'
@@ -548,6 +510,7 @@ const DataManager = {
     try {
       if (authToken && currentUser) {
         const books = await apiCall('/books');
+        // Map database fields to frontend format
         return books.map(book => ({
           id: book.id,
           title: book.title,
@@ -562,7 +525,7 @@ const DataManager = {
     } catch (error) {
       console.warn('API getBooks failed, using localStorage:', error.message);
     }
-    
+    // Fallback to localStorage
     if (!currentUser || !currentUser.id) return [];
     try {
       return JSON.parse(
@@ -577,6 +540,7 @@ const DataManager = {
   async saveBook(book) {
     try {
       if (authToken && currentUser) {
+        // Prepare data for API (match database schema)
         const bookData = {
           title: book.title,
           author: book.author,
@@ -586,10 +550,12 @@ const DataManager = {
         };
 
         if (book.id) {
+          // Update existing book
           await apiCall(`/books/${book.id}`, { method: 'PUT', body: bookData });
           console.log('✅ Book updated in database:', book.id);
           return { ...book, ...bookData, updatedAt: new Date().toISOString() };
         } else {
+          // Create new book
           const result = await apiCall('/books', {
             method: 'POST',
             body: bookData,
@@ -610,6 +576,7 @@ const DataManager = {
       console.warn('Falling back to localStorage');
     }
 
+    // Fallback to localStorage
     if (!currentUser || !currentUser.id) {
       throw new Error('User not logged in');
     }
@@ -648,7 +615,7 @@ const DataManager = {
     } catch (error) {
       console.warn('API deleteBook failed, using localStorage:', error.message);
     }
-    
+    // Fallback to localStorage
     if (!currentUser || !currentUser.id) return;
     const books = JSON.parse(
       localStorage.getItem(`books_${currentUser.id}`) || '[]'
@@ -669,7 +636,7 @@ const DataManager = {
         error.message
       );
     }
-    
+    // Fallback to localStorage
     if (!currentUser || !currentUser.id) return;
     const books = JSON.parse(
       localStorage.getItem(`books_${currentUser.id}`) || '[]'
@@ -687,6 +654,7 @@ const DataManager = {
     try {
       if (authToken && currentUser) {
         const sessions = await apiCall('/sessions');
+        // Map database fields to frontend format
         return sessions.map(session => ({
           id: session.id,
           title: session.title,
@@ -706,7 +674,7 @@ const DataManager = {
         error.message
       );
     }
-    
+    // Fallback to localStorage
     if (!currentUser || !currentUser.id) return [];
     try {
       return JSON.parse(
@@ -721,6 +689,7 @@ const DataManager = {
   async saveSession(session) {
     try {
       if (authToken) {
+        // Prepare data for API (match database schema)
         const sessionData = {
           title: session.title,
           description: session.description || '',
@@ -730,6 +699,7 @@ const DataManager = {
         };
 
         if (session.id) {
+          // Update existing session
           await apiCall(`/sessions/${session.id}`, {
             method: 'PUT',
             body: sessionData,
@@ -737,6 +707,7 @@ const DataManager = {
           console.log('✅ Session updated in database:', session.id);
           return { ...session, ...sessionData };
         } else {
+          // Create new session
           const result = await apiCall('/sessions', {
             method: 'POST',
             body: sessionData,
@@ -756,6 +727,7 @@ const DataManager = {
       console.warn('Falling back to localStorage');
     }
 
+    // Fallback to localStorage if API fails
     const sessions = JSON.parse(
       localStorage.getItem(`sessions_${currentUser.id}`) || '[]'
     );
@@ -883,7 +855,7 @@ const DataManager = {
     } catch (error) {
       console.warn('API getDashboard failed:', error.message);
     }
-    
+    // Fallback: Return local stats
     if (!currentUser || !currentUser.id) {
       return { dashboard: {}, todayStats: {} };
     }
@@ -922,6 +894,7 @@ const DataManager = {
     }
   },
 
+  // Weekly Stats
   async getWeeklyStats() {
     try {
       if (authToken && currentUser) {
@@ -932,9 +905,11 @@ const DataManager = {
     } catch (error) {
       console.warn('API getWeeklyStats failed:', error.message);
     }
+    // Fallback to empty
     return [];
   },
 
+  // Today Stats
   async getTodayStats() {
     try {
       if (authToken && currentUser) {
@@ -947,7 +922,7 @@ const DataManager = {
     } catch (error) {
       console.warn('API getTodayStats failed:', error.message);
     }
-    
+    // Fallback to local calculation
     if (!currentUser || !currentUser.id) {
       return { total_minutes: 0, total_sessions: 0 };
     }
@@ -971,6 +946,7 @@ const DataManager = {
     };
   },
 
+  // Get current streak
   async getStreak() {
     try {
       if (authToken && currentUser) {
@@ -980,9 +956,10 @@ const DataManager = {
     } catch (error) {
       console.warn('API getStreak failed:', error.message);
     }
-    return 0;
+    return 0; // Fallback
   },
 
+  // Get stats summary (all stats in one call)
   async getStatsSummary() {
     try {
       if (authToken && currentUser) {
@@ -993,7 +970,7 @@ const DataManager = {
     } catch (error) {
       console.warn('API getStatsSummary failed:', error.message);
     }
-    
+    // Fallback to individual calls
     const dashboard = await this.getDashboard();
     const weekly = await this.getWeeklyStats();
     return {
@@ -1013,6 +990,7 @@ const DataManager = {
     };
   },
 
+  // Get monthly stats
   async getMonthlyStats() {
     try {
       if (authToken && currentUser) {
@@ -1026,7 +1004,12 @@ const DataManager = {
   },
 };
 
-// ==================== TIMER MANAGER ====================
+// Focus Mode Timer
+let timerInterval;
+let timerMinutes = 25;
+let timerSeconds = 0;
+let isTimerRunning = false;
+let currentTimerType = 'pomodoro';
 
 const TimerManager = {
   startTimer(minutes = 25) {
@@ -1067,6 +1050,7 @@ const TimerManager = {
     if (pauseBtn) pauseBtn.disabled = false;
     if (resetBtn) resetBtn.disabled = false;
 
+    // Show notification
     NotificationManager.show('Timer Dimulai!', {
       body: `Fokus selama ${minutes} menit dimulai sekarang!`,
       icon: '/icons/icon-192x192.png',
@@ -1079,12 +1063,14 @@ const TimerManager = {
     clearInterval(timerInterval);
     isTimerRunning = false;
 
+    // Update UI
     const startBtn = document.getElementById('start-timer');
     const pauseBtn = document.getElementById('pause-timer');
 
     if (startBtn) startBtn.disabled = false;
     if (pauseBtn) pauseBtn.disabled = true;
 
+    // Show notification
     NotificationManager.show('Timer Dijeda', {
       body: 'Sesi fokus Anda telah dijeda.',
       icon: '/icons/icon-192x192.png',
@@ -1095,6 +1081,7 @@ const TimerManager = {
     clearInterval(timerInterval);
     isTimerRunning = false;
 
+    // Reset to current timer type
     if (currentTimerType === 'pomodoro') timerMinutes = 25;
     else if (currentTimerType === 'short-break') timerMinutes = 5;
     else timerMinutes = 15;
@@ -1102,6 +1089,7 @@ const TimerManager = {
     timerSeconds = 0;
     this.updateTimerDisplay();
 
+    // Update UI
     const startBtn = document.getElementById('start-timer');
     const pauseBtn = document.getElementById('pause-timer');
     const resetBtn = document.getElementById('reset-timer');
@@ -1124,6 +1112,7 @@ const TimerManager = {
     clearInterval(timerInterval);
     isTimerRunning = false;
 
+    // Get the duration that was completed
     const completedDuration =
       currentTimerType === 'pomodoro'
         ? 25
@@ -1131,20 +1120,24 @@ const TimerManager = {
         ? 5
         : 15;
 
+    // Show notification
     showToast('Timer selesai!', 'success');
     NotificationManager.showTimerComplete();
 
+    // Play sound (jika diperlukan)
     this.playCompletionSound();
 
+    // Update UI
     const startBtn = document.getElementById('start-timer');
     const pauseBtn = document.getElementById('pause-timer');
 
     if (startBtn) startBtn.disabled = false;
     if (pauseBtn) pauseBtn.disabled = true;
 
-    // Sync stats to database if logged in
+    // Sync stats to database if logged in (only for pomodoro sessions)
     if (currentTimerType === 'pomodoro' && authToken && currentUser) {
       try {
+        // Save timer to database
         const response = await apiCall('/timers', {
           method: 'POST',
           body: JSON.stringify({
@@ -1155,6 +1148,7 @@ const TimerManager = {
         });
 
         if (response && response.id) {
+          // Complete the timer which will also update stats
           await apiCall(`/timers/${response.id}/complete`, {
             method: 'POST',
             body: JSON.stringify({ duration: completedDuration }),
@@ -1166,6 +1160,7 @@ const TimerManager = {
       }
     }
 
+    // Auto-start break if it was a pomodoro session
     if (currentTimerType === 'pomodoro') {
       setTimeout(() => {
         if (confirm('Pomodoro selesai! Mulai istirahat pendek?')) {
@@ -1176,12 +1171,12 @@ const TimerManager = {
   },
 
   playCompletionSound() {
+    // Implement sound notification jika diperlukan
     console.log('Timer completed - play sound');
   },
 };
 
-// ==================== SESSION MANAGER ====================
-
+// Session Manager - Updated to use API
 const SessionManager = {
   async getSessions() {
     return await DataManager.getSessions();
@@ -1204,10 +1199,10 @@ const SessionManager = {
   },
 };
 
-// ==================== MODAL MANAGER ====================
-
+// Modal Manager - FIXED VERSION
 const ModalManager = {
   showModal(title, content) {
+    // Remove existing modal if any
     const existingModal = document.querySelector('.modal');
     if (existingModal) {
       existingModal.remove();
@@ -1227,6 +1222,7 @@ const ModalManager = {
     `;
     document.body.appendChild(modal);
 
+    // Add event listeners
     modal
       .querySelector('.close-modal')
       .addEventListener('click', () => modal.remove());
@@ -1243,11 +1239,15 @@ const ModalManager = {
       <form id="noteForm" class="premium-form">
         <div class="form-group">
           <label>Judul Catatan</label>
-          <input type="text" id="noteTitle" value="${note?.title || ''}" required class="premium-input">
+          <input type="text" id="noteTitle" value="${
+            note?.title || ''
+          }" required class="premium-input">
         </div>
         <div class="form-group">
           <label>Isi Catatan</label>
-          <textarea id="noteContent" rows="6" required class="premium-input">${note?.content || ''}</textarea>
+          <textarea id="noteContent" rows="6" required class="premium-input">${
+            note?.content || ''
+          }</textarea>
         </div>
         <div class="form-group">
           <label>Kategori</label>
@@ -1255,7 +1255,9 @@ const ModalManager = {
             ${['study', 'personal', 'work', 'other']
               .map(
                 cat => `
-              <option value="${cat}" ${note?.category === cat ? 'selected' : ''}>
+              <option value="${cat}" ${
+                  note?.category === cat ? 'selected' : ''
+                }>
                 ${getCategoryLabel(cat)}
               </option>
             `
@@ -1265,7 +1267,9 @@ const ModalManager = {
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 2rem;">
           <button type="button" class="btn btn-secondary premium-btn-secondary" id="cancelNote">Batal</button>
-          <button type="submit" class="btn premium-btn">${isEdit ? 'Update' : 'Simpan'}</button>
+          <button type="submit" class="btn premium-btn">${
+            isEdit ? 'Update' : 'Simpan'
+          }</button>
         </div>
       </form>
     `;
@@ -1275,6 +1279,7 @@ const ModalManager = {
       content
     );
 
+    // Add event listeners
     modal
       .querySelector('#cancelNote')
       .addEventListener('click', () => modal.remove());
@@ -1308,15 +1313,21 @@ const ModalManager = {
       <form id="bookForm" class="premium-form">
         <div class="form-group">
           <label>Judul Buku</label>
-          <input type="text" id="bookTitle" value="${book?.title || ''}" required class="premium-input">
+          <input type="text" id="bookTitle" value="${
+            book?.title || ''
+          }" required class="premium-input">
         </div>
         <div class="form-group">
           <label>Penulis</label>
-          <input type="text" id="bookAuthor" value="${book?.author || ''}" required class="premium-input">
+          <input type="text" id="bookAuthor" value="${
+            book?.author || ''
+          }" required class="premium-input">
         </div>
         <div class="form-group">
           <label>Deskripsi</label>
-          <textarea id="bookDescription" rows="4" class="premium-input">${book?.description || ''}</textarea>
+          <textarea id="bookDescription" rows="4" class="premium-input">${
+            book?.description || ''
+          }</textarea>
         </div>
         <div class="form-group">
           <label>Kategori</label>
@@ -1324,7 +1335,9 @@ const ModalManager = {
             ${['academic', 'fiction', 'non-fiction', 'reference']
               .map(
                 cat => `
-              <option value="${cat}" ${book?.category === cat ? 'selected' : ''}>
+              <option value="${cat}" ${
+                  book?.category === cat ? 'selected' : ''
+                }>
                 ${getBookCategoryLabel(cat)}
               </option>
             `
@@ -1334,13 +1347,16 @@ const ModalManager = {
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 2rem;">
           <button type="button" class="btn btn-secondary premium-btn-secondary" id="cancelBook">Batal</button>
-          <button type="submit" class="btn premium-btn">${isEdit ? 'Update' : 'Simpan'}</button>
+          <button type="submit" class="btn premium-btn">${
+            isEdit ? 'Update' : 'Simpan'
+          }</button>
         </div>
       </form>
     `;
 
     const modal = this.showModal(isEdit ? 'Edit Buku' : 'Tambah Buku', content);
 
+    // Add event listeners
     modal
       .querySelector('#cancelBook')
       .addEventListener('click', () => modal.remove());
@@ -1375,23 +1391,33 @@ const ModalManager = {
       <form id="sessionForm" class="premium-form">
         <div class="form-group">
           <label>Judul Sesi</label>
-          <input type="text" id="sessionTitle" value="${session?.title || ''}" required class="premium-input">
+          <input type="text" id="sessionTitle" value="${
+            session?.title || ''
+          }" required class="premium-input">
         </div>
         <div class="form-group">
           <label>Deskripsi</label>
-          <textarea id="sessionDescription" rows="3" class="premium-input">${session?.description || ''}</textarea>
+          <textarea id="sessionDescription" rows="3" class="premium-input">${
+            session?.description || ''
+          }</textarea>
         </div>
         <div class="form-group">
           <label>Durasi (menit)</label>
-          <input type="number" id="sessionDuration" value="${session?.duration || 25}" min="5" max="180" required class="premium-input">
+          <input type="number" id="sessionDuration" value="${
+            session?.duration || 25
+          }" min="5" max="180" required class="premium-input">
         </div>
         <div class="form-group">
           <label>Mata Pelajaran/Topik</label>
-          <input type="text" id="sessionSubject" value="${session?.subject || ''}" required class="premium-input">
+          <input type="text" id="sessionSubject" value="${
+            session?.subject || ''
+          }" required class="premium-input">
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 2rem;">
           <button type="button" class="btn btn-secondary premium-btn-secondary" id="cancelSession">Batal</button>
-          <button type="submit" class="btn premium-btn">${isEdit ? 'Update' : 'Simpan'}</button>
+          <button type="submit" class="btn premium-btn">${
+            isEdit ? 'Update' : 'Simpan'
+          }</button>
         </div>
       </form>
     `;
@@ -1401,6 +1427,7 @@ const ModalManager = {
       content
     );
 
+    // Add event listeners
     modal
       .querySelector('#cancelSession')
       .addEventListener('click', () => modal.remove());
@@ -1428,9 +1455,122 @@ const ModalManager = {
   },
 };
 
-// ==================== PAGE RENDERING ====================
+// Render Notification Settings Page
+function renderNotificationSettings() {
+  return `
+    <section class="settings-section premium-section">
+      <div class="container">
+        <h1 class="text-center premium-section-title">Pengaturan Notifikasi</h1>
+        <p class="text-center premium-section-subtitle">Kelola preferensi notifikasi Anda</p>
+       
+        <div class="settings-card premium-card" style="max-width: 600px; margin: 0 auto;">
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="push-enabled" ${
+                NotificationManager.getSettings().isPushEnabled ? 'checked' : ''
+              }>
+              <span>Web Push Notifications</span>
+            </label>
+            <small>Terima notifikasi bahkan ketika aplikasi tidak terbuka</small>
+          </div>
+         
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="daily-reminders" ${
+                NotificationManager.getSettings().dailyReminders
+                  ? 'checked'
+                  : ''
+              }>
+              <span>Pengingat Harian</span>
+            </label>
+            <small>Notifikasi pengingat belajar setiap hari</small>
+          </div>
+         
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="session-reminders" ${
+                NotificationManager.getSettings().sessionReminders
+                  ? 'checked'
+                  : ''
+              }>
+              <span>Pengingat Sesi</span>
+            </label>
+            <small>Pengingat sebelum sesi belajar dimulai</small>
+          </div>
+         
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="achievement-alerts" ${
+                NotificationManager.getSettings().achievementAlerts
+                  ? 'checked'
+                  : ''
+              }>
+              <span>Pencapaian & Laporan</span>
+            </label>
+            <small>Notifikasi pencapaian dan laporan mingguan</small>
+          </div>
+         
+          <div class="form-actions" style="margin-top: 2rem;">
+            <button class="btn premium-btn" id="save-notification-settings">
+              <i class="fas fa-save"></i> Simpan Pengaturan
+            </button>
+            <button class="btn premium-btn-secondary" id="test-notification">
+              <i class="fas fa-bell"></i> Test Notifikasi
+            </button>
+          </div>
+         
+          <div class="notification-status" style="margin-top: 1.5rem; padding: 1rem; background: var(--soft-blue); border-radius: var(--border-radius-md);">
+            <h4>Status Notifikasi:</h4>
+            <p>Permission: <strong>${Notification.permission}</strong></p>
+            <p>Service Worker: <strong>${
+              'serviceWorker' in navigator ? 'Supported' : 'Not Supported'
+            }</strong></p>
+            <p>Push Manager: <strong>${
+              'PushManager' in window ? 'Supported' : 'Not Supported'
+            }</strong></p>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
 
+// Initialize Notification Settings Page
+function initializeNotificationSettings() {
+  const saveBtn = document.getElementById('save-notification-settings');
+  const testBtn = document.getElementById('test-notification');
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      const settings = {
+        pushEnabled: document.getElementById('push-enabled').checked,
+        dailyReminders: document.getElementById('daily-reminders').checked,
+        sessionReminders: document.getElementById('session-reminders').checked,
+        achievementAlerts:
+          document.getElementById('achievement-alerts').checked,
+      };
+
+      NotificationManager.updateSettings(settings);
+      showToast('Pengaturan notifikasi disimpan!', 'success');
+
+      // Jika daily reminders diaktifkan, jadwalkan pengingat
+      if (settings.dailyReminders) {
+        NotificationManager.scheduleDailyReminder(8, 0); // Setiap jam 8 pagi
+      }
+    });
+  }
+
+  if (testBtn) {
+    testBtn.addEventListener('click', () => {
+      NotificationManager.testNotification();
+    });
+  }
+}
+
+// Routing & Page Rendering
+let isLoadingPage = false;
 async function loadPage() {
+  // Prevent multiple simultaneous page loads
   if (isLoadingPage) {
     console.log('Page already loading, skipping...');
     return;
@@ -1459,6 +1599,7 @@ async function loadPage() {
 
     mainContent.innerHTML = pages[hash] || pages.beranda;
 
+    // Initialize specific page functionality
     try {
       if (hash === 'beranda' || hash === '') await initializeHomePage();
       if (hash === 'focus-mode') initializeFocusModePage();
@@ -1481,7 +1622,7 @@ async function loadPage() {
   }
 }
 
-// Render Home Page
+// Render functions - Enhanced with premium styling
 function renderHomePage() {
   return `
     <section class="hero premium-hero">
@@ -1588,7 +1729,9 @@ function renderHomePage() {
 // Initialize Home Page with Stats
 async function initializeHomePage() {
   try {
+    // Check if user is logged in
     if (!currentUser || !authToken) {
+      // Show default values for non-logged in users
       const statsElements = [
         'stat-total-minutes',
         'stat-completed-sessions',
@@ -1601,6 +1744,7 @@ async function initializeHomePage() {
         if (el) el.textContent = '0';
       });
 
+      // Show login prompt in chart
       const chartContainer = document.getElementById('weekly-chart');
       if (chartContainer) {
         chartContainer.innerHTML = `
@@ -1614,10 +1758,14 @@ async function initializeHomePage() {
       return;
     }
 
+    // Load stats summary (combines dashboard + weekly + streak in one call)
     const statsSummary = await DataManager.getStatsSummary();
 
+    // Update stats display
     const totalMinutesEl = document.getElementById('stat-total-minutes');
-    const completedSessionsEl = document.getElementById('stat-completed-sessions');
+    const completedSessionsEl = document.getElementById(
+      'stat-completed-sessions'
+    );
     const streakEl = document.getElementById('stat-streak');
     const totalNotesEl = document.getElementById('stat-total-notes');
     const totalBooksEl = document.getElementById('stat-total-books');
@@ -1651,6 +1799,7 @@ async function initializeHomePage() {
         0;
     }
 
+    // Load weekly stats for chart
     const weeklyData =
       statsSummary.weekly?.daily_breakdown ||
       (await DataManager.getWeeklyStats());
@@ -1667,6 +1816,7 @@ function renderWeeklyChart(weeklyData) {
   const chartContainer = document.getElementById('weekly-chart');
   if (!chartContainer) return;
 
+  // Get last 7 days
   const days = [];
   const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
@@ -1680,6 +1830,7 @@ function renderWeeklyChart(weeklyData) {
     });
   }
 
+  // Map weekly data to days
   const dataMap = {};
   if (weeklyData && Array.isArray(weeklyData)) {
     weeklyData.forEach(item => {
@@ -1691,6 +1842,7 @@ function renderWeeklyChart(weeklyData) {
     });
   }
 
+  // Find max value for scaling
   const maxMinutes = Math.max(
     ...days.map(d => dataMap[d.date]?.minutes || 0),
     60
@@ -1902,96 +2054,18 @@ function renderBooksPage() {
   `;
 }
 
-// Render Notification Settings Page
-function renderNotificationSettings() {
-  return `
-    <section class="settings-section premium-section">
-      <div class="container">
-        <h1 class="text-center premium-section-title">Pengaturan Notifikasi</h1>
-        <p class="text-center premium-section-subtitle">Kelola preferensi notifikasi Anda</p>
-       
-        <div class="settings-card premium-card" style="max-width: 600px; margin: 0 auto;">
-          <div class="form-group">
-            <label class="checkbox-label">
-              <input type="checkbox" id="push-enabled" ${
-                NotificationManager.getSettings().isPushEnabled ? 'checked' : ''
-              }>
-              <span>Web Push Notifications</span>
-            </label>
-            <small>Terima notifikasi bahkan ketika aplikasi tidak terbuka</small>
-          </div>
-         
-          <div class="form-group">
-            <label class="checkbox-label">
-              <input type="checkbox" id="daily-reminders" ${
-                NotificationManager.getSettings().dailyReminders
-                  ? 'checked'
-                  : ''
-              }>
-              <span>Pengingat Harian</span>
-            </label>
-            <small>Notifikasi pengingat belajar setiap hari</small>
-          </div>
-         
-          <div class="form-group">
-            <label class="checkbox-label">
-              <input type="checkbox" id="session-reminders" ${
-                NotificationManager.getSettings().sessionReminders
-                  ? 'checked'
-                  : ''
-              }>
-              <span>Pengingat Sesi</span>
-            </label>
-            <small>Pengingat sebelum sesi belajar dimulai</small>
-          </div>
-         
-          <div class="form-group">
-            <label class="checkbox-label">
-              <input type="checkbox" id="achievement-alerts" ${
-                NotificationManager.getSettings().achievementAlerts
-                  ? 'checked'
-                  : ''
-              }>
-              <span>Pencapaian & Laporan</span>
-            </label>
-            <small>Notifikasi pencapaian dan laporan mingguan</small>
-          </div>
-         
-          <div class="form-actions" style="margin-top: 2rem;">
-            <button class="btn premium-btn" id="save-notification-settings">
-              <i class="fas fa-save"></i> Simpan Pengaturan
-            </button>
-            <button class="btn premium-btn-secondary" id="test-notification">
-              <i class="fas fa-bell"></i> Test Notifikasi
-            </button>
-          </div>
-         
-          <div class="notification-status" style="margin-top: 1.5rem; padding: 1rem; background: var(--soft-blue); border-radius: var(--border-radius-md);">
-            <h4>Status Notifikasi:</h4>
-            <p>Permission: <strong>${Notification.permission}</strong></p>
-            <p>Service Worker: <strong>${
-              'serviceWorker' in navigator ? 'Supported' : 'Not Supported'
-            }</strong></p>
-            <p>Push Manager: <strong>${
-              'PushManager' in window ? 'Supported' : 'Not Supported'
-            }</strong></p>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-// ==================== PAGE INITIALIZATIONS ====================
-
 // Initialize Focus Mode Page
 function initializeFocusModePage() {
+  // Timer controls
   const timerButtons = document.querySelectorAll('.timer-btn');
   timerButtons.forEach(btn => {
     btn.addEventListener('click', () => {
+      // Remove active class from all buttons
       timerButtons.forEach(b => b.classList.remove('active'));
+      // Add active class to clicked button
       btn.classList.add('active');
 
+      // Reset timer dengan durasi baru
       const minutes = parseInt(btn.getAttribute('data-minutes'));
       TimerManager.resetTimer();
       timerMinutes = minutes;
@@ -1999,6 +2073,7 @@ function initializeFocusModePage() {
     });
   });
 
+  // Timer actions
   const startBtn = document.getElementById('start-timer');
   const pauseBtn = document.getElementById('pause-timer');
   const resetBtn = document.getElementById('reset-timer');
@@ -2012,6 +2087,7 @@ function initializeFocusModePage() {
   if (resetBtn)
     resetBtn.addEventListener('click', () => TimerManager.resetTimer());
 
+  // Task input
   const currentTask = document.getElementById('current-task');
   if (currentTask) {
     currentTask.addEventListener('blur', () => {
@@ -2022,12 +2098,13 @@ function initializeFocusModePage() {
   }
 }
 
-// Initialize Sessions Page
+// Initialize Sessions Page - FIXED VERSION
 let sessionsPageInitialized = false;
 async function initializeSessionsPage() {
   const sessionList = document.getElementById('session-list');
   if (!sessionList) return;
 
+  // Prevent multiple simultaneous initializations
   if (sessionsPageInitialized) {
     console.log('Sessions page already initializing, skipping...');
     return;
@@ -2100,18 +2177,23 @@ async function initializeSessionsPage() {
         .join('');
     }
 
+    // Remove old event listeners and add new one (event delegation)
     const newSessionList = sessionList.cloneNode(true);
     sessionList.parentNode.replaceChild(newSessionList, sessionList);
 
+    // Event delegation untuk session actions
     document
       .getElementById('session-list')
       .addEventListener('click', handleSessionAction);
 
+    // FIXED: Event listener untuk tombol tambah sesi
     const addSessionBtn = document.getElementById('add-session');
     if (addSessionBtn) {
+      // Remove any existing event listeners
       const newBtn = addSessionBtn.cloneNode(true);
       addSessionBtn.parentNode.replaceChild(newBtn, addSessionBtn);
 
+      // Add new event listener
       document.getElementById('add-session').addEventListener('click', () => {
         ModalManager.showSessionModal();
       });
@@ -2134,12 +2216,20 @@ async function initializeSessionsPage() {
   }
 }
 
-// Initialize Notes Page
+// Helper function to reload sessions page
+async function reloadSessionsPage() {
+  if (window.location.hash.slice(2) === 'sesi-belajar') {
+    await initializeSessionsPage();
+  }
+}
+
+// Initialize Notes Page - ASYNC VERSION
 let notesPageInitialized = false;
 async function initializeNotesPage() {
   const notesGrid = document.querySelector('.notes-grid');
   if (!notesGrid) return;
 
+  // Prevent multiple simultaneous initializations
   if (notesPageInitialized) {
     console.log('Notes page already initializing, skipping...');
     return;
@@ -2189,13 +2279,16 @@ async function initializeNotesPage() {
         .join('');
     }
 
+    // Remove old event listeners and add new one (event delegation)
     const newNotesGrid = notesGrid.cloneNode(true);
     notesGrid.parentNode.replaceChild(newNotesGrid, notesGrid);
 
+    // Event delegation untuk note actions
     document
       .querySelector('.notes-grid')
       .addEventListener('click', handleNoteAction);
 
+    // Filter - remove old listener and add new
     const filterSelect = document.getElementById('note-category-filter');
     if (filterSelect) {
       const newFilterSelect = filterSelect.cloneNode(true);
@@ -2208,11 +2301,14 @@ async function initializeNotesPage() {
         });
     }
 
+    // FIXED: Event listener untuk tombol tambah catatan
     const addNoteBtn = document.getElementById('add-note');
     if (addNoteBtn) {
+      // Remove any existing event listeners
       const newBtn = addNoteBtn.cloneNode(true);
       addNoteBtn.parentNode.replaceChild(newBtn, addNoteBtn);
 
+      // Add new event listener
       document.getElementById('add-note').addEventListener('click', () => {
         ModalManager.showNoteModal();
       });
@@ -2235,13 +2331,21 @@ async function initializeNotesPage() {
   }
 }
 
-// Initialize Books Page
+// Helper function to reload notes page
+async function reloadNotesPage() {
+  if (window.location.hash.slice(2) === 'catatan') {
+    await initializeNotesPage();
+  }
+}
+
+// Initialize Books Page - ASYNC VERSION
 let booksPageInitialized = false;
 async function initializeBooksPage() {
   const readingContainer = document.getElementById('reading-books');
   const completedContainer = document.getElementById('completed-books');
   if (!readingContainer || !completedContainer) return;
 
+  // Prevent multiple simultaneous initializations
   if (booksPageInitialized) {
     console.log('Books page already initializing, skipping...');
     return;
@@ -2330,6 +2434,7 @@ async function initializeBooksPage() {
             )
             .join('');
 
+    // Remove old event listeners and add new one (event delegation)
     const bookshelf = document.querySelector('.bookshelf');
     if (bookshelf) {
       const newBookshelf = bookshelf.cloneNode(true);
@@ -2339,11 +2444,14 @@ async function initializeBooksPage() {
         .addEventListener('click', handleBookAction);
     }
 
+    // Add book button
     const addBookBtn = document.getElementById('add-book');
     if (addBookBtn) {
+      // Remove any existing event listeners
       const newBtn = addBookBtn.cloneNode(true);
       addBookBtn.parentNode.replaceChild(newBtn, addBookBtn);
 
+      // Add new event listener
       document
         .getElementById('add-book')
         .addEventListener('click', () => ModalManager.showBookModal());
@@ -2363,39 +2471,14 @@ async function initializeBooksPage() {
   }
 }
 
-// Initialize Notification Settings Page
-function initializeNotificationSettings() {
-  const saveBtn = document.getElementById('save-notification-settings');
-  const testBtn = document.getElementById('test-notification');
-
-  if (saveBtn) {
-    saveBtn.addEventListener('click', () => {
-      const settings = {
-        pushEnabled: document.getElementById('push-enabled').checked,
-        dailyReminders: document.getElementById('daily-reminders').checked,
-        sessionReminders: document.getElementById('session-reminders').checked,
-        achievementAlerts:
-          document.getElementById('achievement-alerts').checked,
-      };
-
-      NotificationManager.updateSettings(settings);
-      showToast('Pengaturan notifikasi disimpan!', 'success');
-
-      if (settings.dailyReminders) {
-        NotificationManager.scheduleDailyReminder(8, 0);
-      }
-    });
-  }
-
-  if (testBtn) {
-    testBtn.addEventListener('click', () => {
-      NotificationManager.testNotification();
-    });
+// Helper function to reload books page
+async function reloadBooksPage() {
+  if (window.location.hash.slice(2) === 'rak-buku') {
+    await initializeBooksPage();
   }
 }
 
-// ==================== EVENT HANDLERS ====================
-
+// Event Delegation Handlers
 function handleNoteAction(event) {
   const button = event.target.closest('button');
   if (!button) return;
@@ -2441,7 +2524,7 @@ function handleSessionAction(event) {
   if (action === 'delete') deleteSession(sessionId);
 }
 
-// Helper functions for actions
+// Helper functions
 async function editNote(id) {
   try {
     const notes = await DataManager.getNotes();
@@ -2542,33 +2625,63 @@ async function deleteSession(id) {
   }
 }
 
-// Helper functions to reload pages
-async function reloadNotesPage() {
-  if (window.location.hash.slice(2) === 'catatan') {
-    await initializeNotesPage();
-  }
+function getCategoryLabel(cat) {
+  const map = {
+    study: 'Studi',
+    personal: 'Personal',
+    work: 'Pekerjaan',
+    other: 'Lainnya',
+  };
+  return map[cat] || cat;
 }
 
-async function reloadBooksPage() {
-  if (window.location.hash.slice(2) === 'rak-buku') {
-    await initializeBooksPage();
-  }
+function getBookCategoryLabel(cat) {
+  const map = {
+    academic: 'Akademik',
+    fiction: 'Fiksi',
+    'non-fiction': 'Non-Fiksi',
+    reference: 'Referensi',
+  };
+  return map[cat] || cat;
 }
 
-async function reloadSessionsPage() {
-  if (window.location.hash.slice(2) === 'sesi-belajar') {
-    await initializeSessionsPage();
-  }
-}
+// Toast Notification - Enhanced Version
+function showToast(message, type = 'info') {
+  const toastContainer = document.getElementById('toast-container');
+  if (!toastContainer) return;
 
-// ==================== UTILITY FUNCTIONS ====================
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type} premium-toast`;
+  toast.innerHTML = `
+    <div class="toast-content">
+      <i class="fas ${
+        type === 'success'
+          ? 'fa-check-circle'
+          : type === 'error'
+          ? 'fa-times-circle'
+          : type === 'warning'
+          ? 'fa-exclamation-triangle'
+          : 'fa-info-circle'
+      }"></i>
+      <span>${message}</span>
+    </div>
+  `;
+  toastContainer.appendChild(toast);
 
-// Navigation active state
-function updateActiveNav() {
-  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-  const current = window.location.hash.slice(2) || 'beranda';
-  const link = document.querySelector(`nav a[href="#/${current}"]`);
-  if (link) link.classList.add('active');
+  // Add show class after a small delay for animation
+  setTimeout(() => {
+    toast.classList.add('show');
+  }, 10);
+
+  // Remove after 3 seconds
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, 3000);
 }
 
 // Inject component styles
@@ -2621,57 +2734,45 @@ function injectComponentStyles() {
   document.head.appendChild(styles);
 }
 
-// ==================== APP INITIALIZATION ====================
-
-// Inisialisasi Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then(registration => {
-        console.log('SW registered: ', registration);
-      })
-      .catch(registrationError => {
-        console.log('SW registration failed: ', registrationError);
-      });
-  });
+// Navigation active state
+function updateActiveNav() {
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  const current = window.location.hash.slice(2) || 'beranda';
+  const link = document.querySelector(`nav a[href="#/${current}"]`);
+  if (link) link.classList.add('active');
 }
 
-// Inisialisasi Notifikasi
-async function initializeNotifications() {
-  try {
-    await NotificationManager.requestPermission();
-    console.log('Notification permission granted');
-  } catch (error) {
-    console.log('Notification permission denied');
-  }
-}
-
+// Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('FocusMode Premium App Initializing...');
 
   const loadingIndicator = document.getElementById('loading-indicator');
 
+  // Helper to hide loading
   const hideLoading = () => {
     if (loadingIndicator) {
       loadingIndicator.classList.add('hidden');
     }
   };
 
+  // Set a maximum loading timeout (safety net)
   const loadingTimeout = setTimeout(() => {
     console.log('Loading timeout reached, forcing hide');
     hideLoading();
   }, 3000);
 
   try {
+    // Setup offline manager (non-blocking)
     try {
       await OfflineManager.initialize();
     } catch (offlineError) {
       console.warn('Offline manager failed to initialize:', offlineError);
     }
 
+    // Check auth - this will show either auth page or main app
     checkAuth();
 
+    // Initialize notifications (non-blocking)
     try {
       await NotificationManager.requestPermission();
       const settings = NotificationManager.getSettings();
@@ -2683,6 +2784,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.warn('Notification setup failed:', notifError);
     }
 
+    // Create initial backup after delay
     setTimeout(() => {
       try {
         OfflineManager.backupData();
@@ -2694,8 +2796,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('FocusMode Premium App Initialized');
   } catch (error) {
     console.error('App initialization error:', error);
+    // Show auth page as fallback
     showAuthPage();
   } finally {
+    // Clear the safety timeout and hide loading
     clearTimeout(loadingTimeout);
     hideLoading();
   }
@@ -2706,6 +2810,3 @@ window.addEventListener('hashchange', async () => {
     await loadPage();
   }
 });
-
-// Panggil inisialisasi notifikasi
-initializeNotifications();

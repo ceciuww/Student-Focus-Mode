@@ -5,14 +5,12 @@
   "main": "main.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "api": "node start-app.js",
+    "start": "node start-app.js",
     "dev": "concurrently \"npm run api\" \"npm run serve\"",
     "serve": "webpack serve --config webpack.dev.js",
     "build": "webpack --config webpack.prod.js",
     "setup-db": "node setup-database.js",
     "setup": "npm run setup-db",
-    "test": "echo \"No tests specified\"",
     "clean": "rm -rf dist",
     "clean:all": "rm -rf dist node_modules package-lock.json",
     "install:clean": "npm run clean:all && npm install",
@@ -21,10 +19,8 @@
     "format": "prettier --write \"**/*.{js,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,json,md}\"",
     "fullstack": "concurrently --names \"API,CLIENT\" \"npm run api\" \"npm run serve\"",
-    "api:only": "node start-app.js",
     "client:only": "webpack serve --config webpack.dev.js",
-    "production": "npm run build && npm run api",
-    "heroku-postbuild": "npm run build"
+    "production": "npm run build && npm run api"
   },
   "keywords": [
     "pwa",
@@ -48,6 +44,7 @@
     "eslint-config-prettier": "^8.8.0",
     "html-webpack-plugin": "^5.5.0",
     "mini-css-extract-plugin": "^2.7.0",
+    "nodemon": "^3.1.11",
     "prettier": "^2.8.0",
     "style-loader": "^3.3.0",
     "webpack": "^5.88.0",
@@ -71,13 +68,5 @@
   "engines": {
     "node": ">=16.0.0",
     "npm": ">=8.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ceciuww/Student-Distraction-Free-Learning-Focus-Mode-.git"
-  },
-  "bugs": {
-    "url": "https://github.com/ceciuww/Student-Distraction-Free-Learning-Focus-Mode-.git"
-  },
-  "homepage": "https://github.com/ceciuww/Student-Distraction-Free-Learning-Focus-Mode-.git"
+  }
 }

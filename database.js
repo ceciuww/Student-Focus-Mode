@@ -1,75 +1,24 @@
-import dotenv from "dotenv";
 import pkg from 'pg';
 const { Pool } = pkg;
+import dotenv from 'dotenv';
 
 // Load environment variables from .env file
 dotenv.config();
 
-// Extract environment variables
-const { PGHOST, PGDATABASE, PGUSER, PGPASSWORD, PGPORT, PGSSLMODE, NODE_ENV } = process.env;
 
 class Database {
   constructor() {
     this.pool = null;
-    this.config = this.getConfig();
-  }
 
-  // Get database configuration based on environment
-  getConfig() {
-    const isProduction = NODE_ENV === 'production';
-    
-    const baseConfig = {
-      host: PGHOST,
-      database: PGDATABASE,
-      port: PGPORT || 5432,
-      user: PGUSER,
-      password: PGPASSWORD,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-      application_name: 'focusmode-app',
+    this.config = {
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
     };
-
-    // SSL configuration
-    if (isProduction) {
-      // Production: always use SSL
-      baseConfig.ssl = {
-        rejectUnauthorized: false,
-        require: true,
-      };
-    } else {
-      // Development: use SSL if PGSSLMODE is 'require'
-      baseConfig.ssl = PGSSLMODE === 'require' 
-        ? {
-            rejectUnauthorized: false,
-            require: true,
-          }
-        : false;
-    }
-
-    return baseConfig;
   }
 
   async connect() {
     try {
-      // Validate required environment variables
-      const missingVars = [];
-      if (!PGHOST) missingVars.push('PGHOST');
-      if (!PGDATABASE) missingVars.push('PGDATABASE');
-      if (!PGUSER) missingVars.push('PGUSER');
-      if (!PGPASSWORD) missingVars.push('PGPASSWORD');
-
-      if (missingVars.length > 0) {
-        throw new Error(
-          `Missing required PostgreSQL environment variables: ${missingVars.join(', ')}. ` +
-          'Please check your .env file.'
-        );
-      }
-
-      console.log('🔧 Mencoba koneksi ke PostgreSQL...');
-      console.log('📊 Environment:', NODE_ENV || 'development');
-      console.log('🔗 Host:', PGHOST);
-      console.log('💾 Database:', PGDATABASE);
+      console.log('🔧 Mencoba koneksi ke PostgreSQL Neon...');
 
       this.pool = new Pool(this.config);
 
@@ -78,20 +27,15 @@ class Database {
 
       try {
         const result = await client.query(
-          'SELECT version() as version, NOW() as now, current_database() as db'
+          'SELECT version() as version, NOW() as now'
         );
-        console.log('✅ BERHASIL terhubung ke PostgreSQL!');
-        console.log('🐘 PostgreSQL Version:', result.rows[0].version.split(',')[0]);
-        console.log('💾 Database:', result.rows[0].db);
+        console.log('✅ BERHASIL terhubung ke PostgreSQL Neon!');
+        console.log(
+          '🐘 PostgreSQL Version:',
+          result.rows[0].version.split(',')[0]
+        );
         console.log('⏰ Server time:', result.rows[0].now);
         console.log('🚀 Server siap menerima koneksi API');
-
-        // Log current connections count
-        const connectionStats = await client.query(
-          'SELECT COUNT(*) as connections FROM pg_stat_activity WHERE datname = $1',
-          [PGDATABASE]
-        );
-        console.log(`🔌 Active connections: ${connectionStats.rows[0].connections}`);
 
         return this.pool;
       } finally {
@@ -99,32 +43,12 @@ class Database {
       }
     } catch (error) {
       console.error('❌ Database connection failed:', error.message);
-      
-      // Provide helpful troubleshooting information
-      console.log('\n🔧 SOLUSI TROUBLESHOOTING:');
-      console.log('================================');
-      console.log('1. ✅ Periksa koneksi internet Anda');
-      console.log('2. ✅ Verifikasi credential di .env file:');
-      console.log(`   - PGHOST: ${PGHOST ? '✓' : '✗'} ${PGHOST || 'Tidak diatur'}`);
-      console.log(`   - PGDATABASE: ${PGDATABASE ? '✓' : '✗'} ${PGDATABASE || 'Tidak diatur'}`);
-      console.log(`   - PGUSER: ${PGUSER ? '✓' : '✗'} ${PGUSER || 'Tidak diatur'}`);
-      console.log(`   - PGPASSWORD: ${PGPASSWORD ? '✓' : '✗'} ${PGPASSWORD ? '********' : 'Tidak diatur'}`);
-      
-      if (NODE_ENV === 'production') {
-        console.log('\n🌐 PRODUCTION TIPS:');
-        console.log('   - Pastikan database di Railway/Neon sudah running');
-        console.log('   - Periksa allowed IPs di dashboard provider');
-        console.log('   - Verifikasi environment variables di Railway/Netlify');
-      } else {
-        console.log('\n💻 DEVELOPMENT TIPS:');
-        console.log('   - Pastikan PostgreSQL berjalan lokal: brew services start postgresql (Mac)');
-        console.log('   - Atau gunakan docker: docker run -d -p 5432:5432 postgres');
-        console.log('   - Jalankan: npm run setup-db untuk membuat tabel');
-      }
-      
-      console.log('\n🔍 DETAIL ERROR:');
-      console.log(error.stack || error);
-      
+      console.log('\n🔧 SOLUSI:');
+      console.log('1. Periksa koneksi internet Anda');
+      console.log('2. Verifikasi connection details di dashboard.neon.tech');
+      console.log('3. Pastikan database "neondb" sudah dibuat di Neon');
+      console.log('4. Jalankan: npm run setup-db untuk membuat tabel');
+      console.log('5. Periksa apakah IP Anda diizinkan oleh Neon');
       throw error;
     }
   }
@@ -144,29 +68,19 @@ class Database {
 
       const client = await this.pool.connect();
       try {
-        const startTime = Date.now();
         const result = await client.query(sql, params);
-        const duration = Date.now() - startTime;
-        
-        // Log slow queries in development
-        if (NODE_ENV !== 'production' && duration > 1000) {
-          console.warn(`🐢 Slow query (${duration}ms): ${sql.substring(0, 100)}...`);
-        }
-        
         return result.rows;
       } finally {
         client.release();
       }
     } catch (error) {
       console.error('❌ Database query error:', error.message);
-      console.error('📝 Query:', sql);
-      console.error('🔢 Parameters:', params);
+      console.error('Query:', sql);
       throw error;
     }
   }
 
-  // ==================== USER OPERATIONS ====================
-
+  // User operations
   async createUser(userData) {
     const { name, email, password, avatar = 'U' } = userData;
     const sql = `
@@ -187,11 +101,7 @@ class Database {
 
   async getUserByEmail(email) {
     const sql = `
-      SELECT u.*, 
-             us.push_enabled, 
-             us.daily_reminders, 
-             us.session_reminders, 
-             us.achievement_alerts
+      SELECT u.*, us.push_enabled, us.daily_reminders, us.session_reminders, us.achievement_alerts
       FROM users u 
       LEFT JOIN user_settings us ON u.id = us.user_id 
       WHERE u.email = $1 AND u.status = 'active'
@@ -202,11 +112,7 @@ class Database {
 
   async getUserById(id) {
     const sql = `
-      SELECT u.*, 
-             us.push_enabled, 
-             us.daily_reminders, 
-             us.session_reminders, 
-             us.achievement_alerts
+      SELECT u.*, us.push_enabled, us.daily_reminders, us.session_reminders, us.achievement_alerts
       FROM users u 
       LEFT JOIN user_settings us ON u.id = us.user_id 
       WHERE u.id = $1 AND u.status = 'active'
@@ -215,8 +121,7 @@ class Database {
     return users[0] || null;
   }
 
-  // ==================== STUDY SESSIONS OPERATIONS ====================
-
+  // Study Sessions operations
   async getSessionsByUserId(userId) {
     const sql = `
       SELECT * FROM study_sessions 
@@ -235,14 +140,11 @@ class Database {
       duration,
       status = 'planned',
     } = sessionData;
-    
     const sql = `
-      INSERT INTO study_sessions 
-        (user_id, title, description, subject, duration, status) 
+      INSERT INTO study_sessions (user_id, title, description, subject, duration, status) 
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
     `;
-    
     const result = await this.query(sql, [
       user_id,
       title,
@@ -251,7 +153,6 @@ class Database {
       duration,
       status,
     ]);
-    
     return result[0].id;
   }
 
@@ -259,15 +160,9 @@ class Database {
     const { title, description, subject, duration, status } = sessionData;
     let sql = `
       UPDATE study_sessions 
-      SET title = $1, 
-          description = $2, 
-          subject = $3, 
-          duration = $4, 
-          status = $5,
-          updated_at = NOW()
+      SET title = $1, description = $2, subject = $3, duration = $4, status = $5 
       WHERE id = $6
     `;
-    
     const params = [title, description, subject, duration, status, id];
 
     if (userId) {
@@ -293,12 +188,9 @@ class Database {
   async startSession(id, userId = null) {
     let sql = `
       UPDATE study_sessions 
-      SET status = 'inprogress', 
-          started_at = NOW(),
-          updated_at = NOW()
+      SET status = 'inprogress', started_at = NOW() 
       WHERE id = $1
     `;
-    
     const params = [id];
 
     if (userId) {
@@ -312,12 +204,9 @@ class Database {
   async completeSession(id, userId = null) {
     let sql = `
       UPDATE study_sessions 
-      SET status = 'completed', 
-          completed_at = NOW(),
-          updated_at = NOW()
+      SET status = 'completed', completed_at = NOW() 
       WHERE id = $1
     `;
-    
     const params = [id];
 
     if (userId) {
@@ -328,8 +217,7 @@ class Database {
     await this.query(sql, params);
   }
 
-  // ==================== NOTES OPERATIONS ====================
-
+  // Notes operations
   async getNotesByUserId(userId, category = 'all') {
     let sql = 'SELECT * FROM notes WHERE user_id = $1';
     const params = [userId];
@@ -345,29 +233,22 @@ class Database {
 
   async createNote(noteData) {
     const { user_id, title, content, category = 'study' } = noteData;
-    
     const sql = `
       INSERT INTO notes (user_id, title, content, category) 
       VALUES ($1, $2, $3, $4)
       RETURNING id
     `;
-    
     const result = await this.query(sql, [user_id, title, content, category]);
     return result[0].id;
   }
 
   async updateNote(id, noteData, userId = null) {
     const { title, content, category } = noteData;
-    
     let sql = `
       UPDATE notes 
-      SET title = $1, 
-          content = $2, 
-          category = $3,
-          updated_at = NOW()
+      SET title = $1, content = $2, category = $3 
       WHERE id = $4
     `;
-    
     const params = [title, content, category, id];
 
     if (userId) {
@@ -390,8 +271,7 @@ class Database {
     await this.query(sql, params);
   }
 
-  // ==================== BOOKS OPERATIONS ====================
-
+  // Books operations
   async getBooksByUserId(userId) {
     const sql = `
       SELECT * FROM books 
@@ -410,14 +290,11 @@ class Database {
       category = 'academic',
       is_complete = false,
     } = bookData;
-    
     const sql = `
-      INSERT INTO books 
-        (user_id, title, author, description, category, is_complete) 
+      INSERT INTO books (user_id, title, author, description, category, is_complete) 
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
     `;
-    
     const result = await this.query(sql, [
       user_id,
       title,
@@ -426,24 +303,16 @@ class Database {
       category,
       is_complete,
     ]);
-    
     return result[0].id;
   }
 
   async updateBook(id, bookData, userId = null) {
     const { title, author, description, category, is_complete } = bookData;
-    
     let sql = `
       UPDATE books 
-      SET title = $1, 
-          author = $2, 
-          description = $3, 
-          category = $4, 
-          is_complete = $5,
-          updated_at = NOW()
+      SET title = $1, author = $2, description = $3, category = $4, is_complete = $5 
       WHERE id = $6
     `;
-    
     const params = [title, author, description, category, is_complete, id];
 
     if (userId) {
@@ -469,11 +338,9 @@ class Database {
   async toggleBookStatus(id, userId = null) {
     let sql = `
       UPDATE books 
-      SET is_complete = NOT is_complete, 
-          updated_at = NOW()
+      SET is_complete = NOT is_complete, updated_at = NOW() 
       WHERE id = $1
     `;
-    
     const params = [id];
 
     if (userId) {
@@ -484,8 +351,7 @@ class Database {
     await this.query(sql, params);
   }
 
-  // ==================== STATISTICS OPERATIONS ====================
-
+  // Statistics operations
   async getTodayStats(userId) {
     const sql = `
       SELECT 
@@ -496,7 +362,6 @@ class Database {
         AND DATE(created_at) = CURRENT_DATE 
         AND status = 'completed'
     `;
-    
     const results = await this.query(sql, [userId]);
     return results[0] || { total_minutes: 0, total_sessions: 0 };
   }
@@ -514,7 +379,6 @@ class Database {
       GROUP BY DATE(created_at)
       ORDER BY study_date DESC
     `;
-    
     return await this.query(sql, [userId]);
   }
 
@@ -524,11 +388,8 @@ class Database {
         u.name,
         u.email,
         u.avatar,
-        u.created_at as joined_date,
         us.push_enabled,
         us.daily_reminders,
-        us.session_reminders,
-        us.achievement_alerts,
         (
           SELECT COUNT(*) 
           FROM study_sessions 
@@ -548,13 +409,11 @@ class Database {
       LEFT JOIN user_settings us ON u.id = us.user_id
       WHERE u.id = $1
     `;
-    
     const results = await this.query(sql, [userId]);
     return results[0] || null;
   }
 
-  // ==================== FOCUS TIMERS OPERATIONS ====================
-
+  // Focus timers operations
   async saveFocusTimer(timerData) {
     const {
       user_id,
@@ -563,14 +422,11 @@ class Database {
       completed = false,
       task_description,
     } = timerData;
-    
     const sql = `
-      INSERT INTO focus_timers 
-        (user_id, timer_type, duration, completed, task_description) 
+      INSERT INTO focus_timers (user_id, timer_type, duration, completed, task_description) 
       VALUES ($1, $2, $3, $4, $5)
       RETURNING id
     `;
-    
     const result = await this.query(sql, [
       user_id,
       timer_type,
@@ -578,19 +434,15 @@ class Database {
       completed,
       task_description,
     ]);
-    
     return result[0].id;
   }
 
   async completeFocusTimer(id) {
     const sql = `
       UPDATE focus_timers 
-      SET completed = TRUE, 
-          completed_at = NOW(),
-          updated_at = NOW()
+      SET completed = TRUE, completed_at = NOW() 
       WHERE id = $1
     `;
-    
     await this.query(sql, [id]);
   }
 
@@ -601,12 +453,10 @@ class Database {
       ORDER BY started_at DESC 
       LIMIT 50
     `;
-    
     return await this.query(sql, [userId]);
   }
 
-  // ==================== STUDY STATS OPERATIONS ====================
-
+  // Study Stats operations
   async updateStudyStats(userId, minutes, sessionCompleted = true) {
     const today = new Date().toISOString().split('T')[0];
 
@@ -615,7 +465,6 @@ class Database {
       SELECT * FROM study_stats 
       WHERE user_id = $1 AND date = $2
     `;
-    
     const existing = await this.query(checkSql, [userId, today]);
 
     if (existing.length > 0) {
@@ -628,7 +477,6 @@ class Database {
             updated_at = NOW()
         WHERE user_id = $3 AND date = $4
       `;
-      
       await this.query(updateSql, [
         minutes,
         sessionCompleted ? 1 : 0,
@@ -639,15 +487,10 @@ class Database {
       // Create new stats entry
       const insertSql = `
         INSERT INTO study_stats (
-          user_id, 
-          date, 
-          total_sessions, 
-          total_minutes, 
-          completed_sessions, 
-          streak_days
+          user_id, date, total_sessions, 
+          total_minutes, completed_sessions, streak_days
         ) VALUES ($1, $2, 1, $3, $4, 1)
       `;
-      
       await this.query(insertSql, [
         userId,
         today,
@@ -672,20 +515,16 @@ class Database {
       FROM study_stats 
       WHERE user_id = $1 AND date = $2
     `;
-    
     const yesterdayStats = await this.query(checkSql, [userId, yesterdayStr]);
 
-    if (yesterdayStats.length > 0 && yesterdayStats[0].streak_days > 0) {
+    if (yesterdayStats.length > 0) {
       // Increment streak from yesterday
       const newStreak = (yesterdayStats[0].streak_days || 0) + 1;
-      
       const updateSql = `
         UPDATE study_stats 
-        SET streak_days = $1, 
-            updated_at = NOW()
+        SET streak_days = $1, updated_at = NOW()
         WHERE user_id = $2 AND date = CURRENT_DATE
       `;
-      
       await this.query(updateSql, [newStreak, userId]);
     }
   }
@@ -697,7 +536,6 @@ class Database {
         AND date >= CURRENT_DATE - INTERVAL '${days} days'
       ORDER BY date DESC
     `;
-    
     return await this.query(sql, [userId]);
   }
 
@@ -706,13 +544,9 @@ class Database {
       SELECT streak_days 
       FROM study_stats 
       WHERE user_id = $1 
-        AND date = (
-          SELECT MAX(date) 
-          FROM study_stats 
-          WHERE user_id = $1
-        )
+      ORDER BY date DESC 
+      LIMIT 1
     `;
-    
     const result = await this.query(sql, [userId]);
     return result[0]?.streak_days || 0;
   }
@@ -730,57 +564,7 @@ class Database {
       GROUP BY TO_CHAR(date, 'YYYY-MM')
       ORDER BY month DESC
     `;
-    
     return await this.query(sql, [userId]);
-  }
-
-  // ==================== DATABASE HEALTH CHECK ====================
-
-  async healthCheck() {
-    try {
-      if (!this.pool) {
-        await this.connect();
-      }
-
-      const result = await this.query('SELECT NOW() as time, 1 as status');
-      
-      return {
-        status: 'healthy',
-        database: 'connected',
-        time: result[0].time,
-        timestamp: Date.now()
-      };
-    } catch (error) {
-      return {
-        status: 'unhealthy',
-        database: 'disconnected',
-        error: error.message,
-        timestamp: Date.now()
-      };
-    }
-  }
-
-  // ==================== TRANSACTION SUPPORT ====================
-
-  async transaction(callback) {
-    const client = await this.pool.connect();
-    
-    try {
-      await client.query('BEGIN');
-      const result = await callback(client);
-      await client.query('COMMIT');
-      return result;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async queryWithClient(client, sql, params = []) {
-    const result = await client.query(sql, params);
-    return result.rows;
   }
 }
 

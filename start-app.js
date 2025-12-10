@@ -4,7 +4,7 @@ import Database from './database.js';
 async function startApplication() {
   console.log('🚀 Starting FocusMode Application...');
   console.log('📍 Target: PostgreSQL Neon');
-  console.log('🔗 Connection String:', psql 'postgresql://neondb_owner:npg_gbS0enzEZTq5@ep-patient-mountain-a145nmbc-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require');
+  console.log('🔗 Connection String:', 'postgresql://neondb_owner:****@ep-patient-mountain-a145nmbc-pooler.ap-southeast-1.aws.neon.tech/neondb');
   console.log('──────────────────────────────────────');
   
   try {
@@ -19,7 +19,7 @@ async function startApplication() {
     console.log('📊 Starting API server...');
     console.log('🔄 Importing API server module...');
     
-    const { default: apiServer } = await import('./api-server.js');
+    const { default: apiServer } = await import('./server.js');
     
     console.log('🎯 API server imported successfully!');
     console.log('📡 Server should be running on port 3001');

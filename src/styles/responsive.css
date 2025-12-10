@@ -55,10 +55,6 @@
     grid-template-columns: 1fr;
   }
 
-  .auth-card {
-    padding: 2rem;
-  }
-
   .modal-content {
     margin: 1rem;
     padding: 1.5rem;
@@ -101,10 +97,6 @@
 
   .auth-tabs {
     flex-direction: column;
-  }
-
-  .auth-tab {
-    margin-bottom: 0.5rem;
   }
 }
 
