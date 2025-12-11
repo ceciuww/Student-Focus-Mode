@@ -817,7 +817,8 @@ app.delete("/api/books/:id", authenticateToken, async (req, res) => {
   }
 })
 
-app.post("/api/books/:id/toggle", authenticateToken, async (req, res) => {
+// PATCH endpoint to toggle book completion status
+app.patch("/api/books/:id/toggle", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
 
@@ -1061,6 +1062,129 @@ app.put("/api/settings", authenticateToken, async (req, res) => {
     res.status(500).json({
       error: "Server error",
       message: "Failed to update settings",
+    })
+  }
+})
+
+app.get("/api/vapid-public-key", (req, res) => {
+  const publicKey = process.env.VAPID_PUBLIC_KEY
+
+  if (!publicKey) {
+    console.warn("[Server] VAPID_PUBLIC_KEY environment variable not set")
+    return res.status(503).json({
+      error: "Push notifications not configured",
+      message: "VAPID_PUBLIC_KEY environment variable is missing",
+    })
+  }
+
+  res.json({
+    publicKey: publicKey,
+  })
+})
+
+// Push subscription routes
+app.post("/api/push-subscriptions", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const subscription = req.body
+
+    // Validate subscription data
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid subscription data",
+      })
+    }
+
+    // Save subscription to database
+    const subscriptionId = await db.subscribeUserToPush(userId, subscription)
+
+    res.status(201).json({
+      success: true,
+      message: "Successfully subscribed to push notifications",
+      subscriptionId,
+    })
+  } catch (error) {
+    console.error("Push subscription error:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to subscribe to push notifications",
+      error: error.message,
+    })
+  }
+})
+
+// GET user's push subscriptions
+app.get("/api/push-subscriptions", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    const subscriptions = await db.getUserSubscriptions(userId)
+
+    res.status(200).json({
+      success: true,
+      subscriptions,
+    })
+  } catch (error) {
+    console.error("Get subscriptions error:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve push subscriptions",
+      error: error.message,
+    })
+  }
+})
+
+// DELETE specific push subscription
+app.delete("/api/push-subscriptions/:id", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const subscriptionId = req.params.id
+
+    // Verify subscription exists and belongs to user
+    const subscription = await db.getById("push_subscriptions", subscriptionId, userId)
+
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription not found",
+      })
+    }
+
+    await db.deleteSubscription(subscriptionId, userId)
+
+    res.status(200).json({
+      success: true,
+      message: "Successfully unsubscribed from push notifications",
+    })
+  } catch (error) {
+    console.error("Delete subscription error:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete push subscription",
+      error: error.message,
+    })
+  }
+})
+
+// DELETE push subscription by endpoint (for when browser unregisters)
+app.delete("/api/push-subscriptions/endpoint/:endpoint", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const endpoint = req.params.endpoint
+
+    await db.deleteSubscriptionByEndpoint(endpoint, userId)
+
+    res.status(200).json({
+      success: true,
+      message: "Successfully unsubscribed from push notifications",
+    })
+  } catch (error) {
+    console.error("Delete subscription by endpoint error:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete push subscription",
+      error: error.message,
     })
   }
 })
