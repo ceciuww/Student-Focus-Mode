@@ -238,7 +238,7 @@ function showAuthPage() {
       showMainApp();
       NotificationManager.show('Selamat Datang!', {
         body: `Halo ${currentUser.name}, selamat belajar!`,
-        icon: '/icons/icon-192x192.png',
+        icon: './icons/icon-192x192.png',
       });
     } catch (error) {
       console.warn('API login failed, trying local login:', error.message);
@@ -254,7 +254,7 @@ function showAuthPage() {
         showMainApp();
         NotificationManager.show('Selamat Datang!', {
           body: `Halo ${user.name}, selamat belajar!`,
-          icon: '/icons/icon-192x192.png',
+          icon: './icons/icon-192x192.png',
         });
       } else {
         showToast('Email atau password salah!', 'error');

@@ -126,8 +126,8 @@ export class NotificationManager {
     }
 
     const notification = new Notification(title, {
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-72x72.png',
+      icon: './icons/icon-192x192.png',
+      badge: './icons/icon-72x72.png',
       vibrate: [200, 100, 200],
       ...options,
     });
@@ -184,7 +184,7 @@ export class NotificationManager {
     return this.show('🏆 ' + title, {
       body: message,
       tag: 'achievement',
-      icon: '/icons/icon-512x512.png',
+      icon: './icons/icon-512x512.png',
       requireInteraction: true,
       data: { url: '#/' }
     });
