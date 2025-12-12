@@ -164,8 +164,8 @@ export const Api = {
       return Api.post(`/sessions/${id}/start`, {});
     },
 
-    async complete(id) {
-      return Api.post(`/sessions/${id}/complete`, {});
+    async complete(id, duration) {
+      return Api.post(`/sessions/${id}/complete`, { duration });
     },
   },
 
