@@ -56,3 +56,9 @@ Aplikasi web progresif (PWA) yang dirancang untuk membantu siswa dan pelajar men
    ```bash
    git clone https://github.com/username/focusmode-student-learning.git
    cd focusmode-student-learning
+
+2. **Jalankan project**
+   ```bash
+   npm install
+   npm run build
+   npm run start
